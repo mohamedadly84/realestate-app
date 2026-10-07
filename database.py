@@ -545,9 +545,9 @@ def report_unit_profitability():
     conn = get_connection()
     df = conn.query("""
         SELECT u.id, u.unit_number, u.building, u.area, u.price, u.status,
-               c.total_price,
-               COALESCE((SELECT SUM(amount) FROM expenses WHERE building = u.building), 0),
-               COALESCE((SELECT COUNT(*) FROM units u2 WHERE u2.building = u.building), 1)
+               c.total_price as sale_price,
+               COALESCE((SELECT SUM(amount) FROM expenses WHERE building = u.building), 0) as building_cost,
+               COALESCE((SELECT COUNT(*) FROM units u2 WHERE u2.building = u.building), 1) as units_in_building
         FROM units u
         LEFT JOIN contracts c ON c.unit_id = u.id
         ORDER BY u.building, u.unit_number
@@ -555,13 +555,22 @@ def report_unit_profitability():
 
     result = []
     for _, row in df.iterrows():
-        unit_cost = row[7] / row[8] if row[8] > 0 else 0
-        sale_price = row[6] if row[6] else 0
+        building_cost = float(row["building_cost"]) if row["building_cost"] else 0
+        units_count = int(row["units_in_building"]) if row["units_in_building"] else 1
+        unit_cost = building_cost / units_count if units_count > 0 else 0
+
+        sale_price = float(row["sale_price"]) if row["sale_price"] else 0
         profit = sale_price - unit_cost if sale_price else -unit_cost
+
         result.append({
-            "unit_number": row[1], "building": row[2], "area": row[3],
-            "price": row[4], "status": row[5],
-            "sale_price": sale_price, "unit_cost": unit_cost, "profit": profit
+            "unit_number": row["unit_number"],
+            "building": row["building"],
+            "area": row["area"],
+            "price": row["price"],
+            "status": row["status"],
+            "sale_price": sale_price,
+            "unit_cost": unit_cost,
+            "profit": profit
         })
     return result
 
