@@ -35,3 +35,7 @@ ARIALN*.TTF
 # ملفات مؤقتة
 New Text Document.txt
 README.txt
+# ملفات مش محتاجينها على GitHub
+OFL.txt
+README.txt
+static/
