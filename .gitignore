@@ -1,0 +1,19 @@
+# قاعدة البيانات (القديمة)
+*.db
+*.db-journal
+
+# secrets
+.streamlit/secrets.toml
+
+# Python
+__pycache__/
+*.py[cod]
+venv/
+env/
+
+# VS Code
+.vscode/
+
+# نظام التشغيل
+.DS_Store
+Thumbs.db
