@@ -17,3 +17,21 @@ env/
 # نظام التشغيل
 .DS_Store
 Thumbs.db
+# نسخ secrets الاحتياطية
+.streamlit/*.txt
+.streamlit/*.bak
+.streamlit/*.old
+
+# ملفات الخطوط (بس arial.ttf)
+*.TTF
+*.zip
+Cairo*.ttf
+arialbd.ttf
+arialbi.ttf
+ariali.ttf
+ariblk.ttf
+ARIALN*.TTF
+
+# ملفات مؤقتة
+New Text Document.txt
+README.txt
