@@ -4,6 +4,8 @@ from datetime import date
 import hashlib
 import pandas as pd
 from sqlalchemy import text
+
+
 def create_tables():
     """إنشاء الجداول لو مش موجودة"""
     conn = get_connection()
@@ -124,20 +126,40 @@ def create_tables():
         # بنود افتراضية
         result = session.execute(text("SELECT COUNT(*) FROM expense_categories"))
         if result.scalar() == 0:
-            for cat in ["مواد بناء", "مقاولون", "عمالة", "إشراف هندسي",
-                        "تشطيبات", "كهرباء وسباكة", "رخصة وتراخيص",
-                        "مصاريف إدارية", "أخرى"]:
-                session.execute(text("INSERT INTO expense_categories (name) VALUES (:name)"), {"name": cat})
+            for cat in [
+                "مواد بناء",
+                "مقاولون",
+                "عمالة",
+                "إشراف هندسي",
+                "تشطيبات",
+                "كهرباء وسباكة",
+                "رخصة وتراخيص",
+                "مصاريف إدارية",
+                "أخرى",
+            ]:
+                session.execute(
+                    text("INSERT INTO expense_categories (name) VALUES (:name)"),
+                    {"name": cat},
+                )
 
         # مستخدم admin افتراضي
         result = session.execute(text("SELECT COUNT(*) FROM users"))
         if result.scalar() == 0:
             session.execute(
-                text("INSERT INTO users (username, password_hash, full_name, role, active, created_at) VALUES (:u, :p, :n, :r, 1, :d)"),
-                {"u": "admin", "p": hash_password("admin123"), "n": "المدير", "r": "admin", "d": str(date.today())}
+                text(
+                    "INSERT INTO users (username, password_hash, full_name, role, active, created_at) VALUES (:u, :p, :n, :r, 1, :d)"
+                ),
+                {
+                    "u": "admin",
+                    "p": hash_password("admin123"),
+                    "n": "المدير",
+                    "r": "admin",
+                    "d": str(date.today()),
+                },
             )
 
         session.commit()
+
 
 DB_NAME = "realestate.db"
 
@@ -156,14 +178,22 @@ def get_connection():
 # ========== Auth (مش محتاجة cache) ==========
 def authenticate_user(username, password):
     conn = get_connection()
-    df = conn.query("""
+    df = conn.query(
+        """
         SELECT id, username, full_name, role, active FROM users
         WHERE username = :u AND password_hash = :p
-    """, params={"u": username, "p": hash_password(password)}, ttl=0)
+    """,
+        params={"u": username, "p": hash_password(password)},
+        ttl=0,
+    )
     if not df.empty and df.iloc[0]["active"] == 1:
         row = df.iloc[0]
-        return {"id": int(row["id"]), "username": row["username"],
-                "full_name": row["full_name"], "role": row["role"]}
+        return {
+            "id": int(row["id"]),
+            "username": row["username"],
+            "full_name": row["full_name"],
+            "role": row["role"],
+        }
     return None
 
 
@@ -190,11 +220,20 @@ def add_unit(unit_number, building, floor, area, price, status="متاحة"):
     conn = get_connection()
     with conn.session as session:
         try:
-            session.execute(text("""
+            session.execute(
+                text("""
                 INSERT INTO units (unit_number, building, floor, area, price, status)
                 VALUES (:un, :b, :f, :a, :p, :s)
-            """), {"un": unit_number, "b": building, "f": floor,
-                   "a": area, "p": price, "s": status})
+            """),
+                {
+                    "un": unit_number,
+                    "b": building,
+                    "f": floor,
+                    "a": area,
+                    "p": price,
+                    "s": status,
+                },
+            )
             session.commit()
             clear_all_cache()
             return True
@@ -205,8 +244,10 @@ def add_unit(unit_number, building, floor, area, price, status="متاحة"):
 def update_unit_status(unit_id, new_status):
     conn = get_connection()
     with conn.session as session:
-        session.execute(text("UPDATE units SET status = :s WHERE id = :id"),
-                        {"s": new_status, "id": unit_id})
+        session.execute(
+            text("UPDATE units SET status = :s WHERE id = :id"),
+            {"s": new_status, "id": unit_id},
+        )
         session.commit()
         clear_all_cache()
 
@@ -215,12 +256,22 @@ def update_unit(unit_id, unit_number, building, floor, area, price, status):
     conn = get_connection()
     with conn.session as session:
         try:
-            session.execute(text("""
+            session.execute(
+                text("""
                 UPDATE units SET unit_number=:un, building=:b, floor=:f,
                                 area=:a, price=:p, status=:s
                 WHERE id=:id
-            """), {"un": unit_number, "b": building, "f": floor,
-                   "a": area, "p": price, "s": status, "id": unit_id})
+            """),
+                {
+                    "un": unit_number,
+                    "b": building,
+                    "f": floor,
+                    "a": area,
+                    "p": price,
+                    "s": status,
+                    "id": unit_id,
+                },
+            )
             session.commit()
             clear_all_cache()
             return True
@@ -231,8 +282,9 @@ def update_unit(unit_id, unit_number, building, floor, area, price, status):
 def delete_unit(unit_id):
     conn = get_connection()
     with conn.session as session:
-        result = session.execute(text("SELECT COUNT(*) FROM contracts WHERE unit_id = :id"),
-                                 {"id": unit_id})
+        result = session.execute(
+            text("SELECT COUNT(*) FROM contracts WHERE unit_id = :id"), {"id": unit_id}
+        )
         if result.scalar() > 0:
             return False
         session.execute(text("DELETE FROM units WHERE id = :id"), {"id": unit_id})
@@ -243,8 +295,11 @@ def delete_unit(unit_id):
 
 def unit_has_contract(unit_id):
     conn = get_connection()
-    df = conn.query("SELECT COUNT(*) as count FROM contracts WHERE unit_id = :id",
-                    params={"id": unit_id}, ttl=0)
+    df = conn.query(
+        "SELECT COUNT(*) as count FROM contracts WHERE unit_id = :id",
+        params={"id": unit_id},
+        ttl=0,
+    )
     return df.iloc[0]["count"] > 0
 
 
@@ -258,18 +313,22 @@ def get_all_customers():
 
 def get_customer_by_id(customer_id):
     conn = get_connection()
-    df = conn.query("SELECT * FROM customers WHERE id = :id",
-                    params={"id": customer_id}, ttl=0)
+    df = conn.query(
+        "SELECT * FROM customers WHERE id = :id", params={"id": customer_id}, ttl=0
+    )
     return df.values.tolist()[0] if not df.empty else None
 
 
 def add_customer(name, phone="", national_id="", address="", notes=""):
     conn = get_connection()
     with conn.session as session:
-        result = session.execute(text("""
+        result = session.execute(
+            text("""
             INSERT INTO customers (name, phone, national_id, address, notes)
             VALUES (:n, :p, :nid, :a, :no) RETURNING id
-        """), {"n": name, "p": phone, "nid": national_id, "a": address, "no": notes})
+        """),
+            {"n": name, "p": phone, "nid": national_id, "a": address, "no": notes},
+        )
         session.commit()
         clear_all_cache()
         return result.scalar()
@@ -278,12 +337,21 @@ def add_customer(name, phone="", national_id="", address="", notes=""):
 def update_customer(customer_id, name, phone, national_id, address, notes):
     conn = get_connection()
     with conn.session as session:
-        session.execute(text("""
+        session.execute(
+            text("""
             UPDATE customers SET name=:n, phone=:p, national_id=:nid,
                                  address=:a, notes=:no
             WHERE id=:id
-        """), {"n": name, "p": phone, "nid": national_id,
-               "a": address, "no": notes, "id": customer_id})
+        """),
+            {
+                "n": name,
+                "p": phone,
+                "nid": national_id,
+                "a": address,
+                "no": notes,
+                "id": customer_id,
+            },
+        )
         session.commit()
         clear_all_cache()
 
@@ -291,11 +359,15 @@ def update_customer(customer_id, name, phone, national_id, address, notes):
 def delete_customer(customer_id):
     conn = get_connection()
     with conn.session as session:
-        result = session.execute(text("SELECT COUNT(*) FROM contracts WHERE customer_id = :id"),
-                                 {"id": customer_id})
+        result = session.execute(
+            text("SELECT COUNT(*) FROM contracts WHERE customer_id = :id"),
+            {"id": customer_id},
+        )
         if result.scalar() > 0:
             return False
-        session.execute(text("DELETE FROM customers WHERE id = :id"), {"id": customer_id})
+        session.execute(
+            text("DELETE FROM customers WHERE id = :id"), {"id": customer_id}
+        )
         session.commit()
         clear_all_cache()
         return True
@@ -303,8 +375,11 @@ def delete_customer(customer_id):
 
 def customer_has_contract(customer_id):
     conn = get_connection()
-    df = conn.query("SELECT COUNT(*) as count FROM contracts WHERE customer_id = :id",
-                    params={"id": customer_id}, ttl=0)
+    df = conn.query(
+        "SELECT COUNT(*) as count FROM contracts WHERE customer_id = :id",
+        params={"id": customer_id},
+        ttl=0,
+    )
     return df.iloc[0]["count"] > 0
 
 
@@ -312,19 +387,23 @@ def customer_has_contract(customer_id):
 @st.cache_data(ttl=CACHE_TTL)
 def get_all_contracts():
     conn = get_connection()
-    df = conn.query("""
+    df = conn.query(
+        """
         SELECT c.id, u.unit_number, cu.name, c.total_price, c.down_payment, c.contract_date
         FROM contracts c
         JOIN units u ON c.unit_id = u.id
         JOIN customers cu ON c.customer_id = cu.id
         ORDER BY c.id DESC
-    """, ttl=0)
+    """,
+        ttl=0,
+    )
     return df.values.tolist()
 
 
 def get_contract_full_details(contract_id):
     conn = get_connection()
-    df = conn.query("""
+    df = conn.query(
+        """
         SELECT c.id, c.total_price, c.down_payment, c.contract_date, c.notes,
                u.unit_number, u.building, u.floor, u.area, u.price,
                cu.name, cu.phone, cu.national_id, cu.address
@@ -332,27 +411,45 @@ def get_contract_full_details(contract_id):
         JOIN units u ON c.unit_id = u.id
         JOIN customers cu ON c.customer_id = cu.id
         WHERE c.id = :id
-    """, params={"id": contract_id}, ttl=0)
+    """,
+        params={"id": contract_id},
+        ttl=0,
+    )
     return df.values.tolist()[0] if not df.empty else None
 
 
 def get_installments_by_contract(contract_id):
     conn = get_connection()
-    df = conn.query("""
+    df = conn.query(
+        """
         SELECT id, installment_number, due_date, amount, paid_amount, status
         FROM installments WHERE contract_id = :id ORDER BY installment_number
-    """, params={"id": contract_id}, ttl=0)
+    """,
+        params={"id": contract_id},
+        ttl=0,
+    )
     return df.values.tolist()
 
 
-def add_contract(unit_id, customer_id, total_price, down_payment, contract_date, notes=""):
+def add_contract(
+    unit_id, customer_id, total_price, down_payment, contract_date, notes=""
+):
     conn = get_connection()
     with conn.session as session:
-        result = session.execute(text("""
+        result = session.execute(
+            text("""
             INSERT INTO contracts (unit_id, customer_id, total_price, down_payment, contract_date, notes)
             VALUES (:ui, :ci, :tp, :dp, :cd, :n) RETURNING id
-        """), {"ui": unit_id, "ci": customer_id, "tp": total_price,
-               "dp": down_payment, "cd": contract_date, "n": notes})
+        """),
+            {
+                "ui": unit_id,
+                "ci": customer_id,
+                "tp": total_price,
+                "dp": down_payment,
+                "cd": contract_date,
+                "n": notes,
+            },
+        )
         session.commit()
         clear_all_cache()
         return result.scalar()
@@ -361,10 +458,13 @@ def add_contract(unit_id, customer_id, total_price, down_payment, contract_date,
 def add_installment(contract_id, number, due_date, amount):
     conn = get_connection()
     with conn.session as session:
-        session.execute(text("""
+        session.execute(
+            text("""
             INSERT INTO installments (contract_id, installment_number, due_date, amount, paid_amount, status)
             VALUES (:ci, :n, :dd, :a, 0, 'مستحق')
-        """), {"ci": contract_id, "n": number, "dd": due_date, "a": amount})
+        """),
+            {"ci": contract_id, "n": number, "dd": due_date, "a": amount},
+        )
         session.commit()
         clear_all_cache()
 
@@ -373,17 +473,22 @@ def add_installment(contract_id, number, due_date, amount):
 def pay_installment(installment_id, amount):
     conn = get_connection()
     with conn.session as session:
-        result = session.execute(text("SELECT amount, paid_amount FROM installments WHERE id = :id"),
-                                 {"id": installment_id})
+        result = session.execute(
+            text("SELECT amount, paid_amount FROM installments WHERE id = :id"),
+            {"id": installment_id},
+        )
         row = result.fetchone()
         if not row:
             return False
         total_amount, paid_amount = row
         new_paid = min(paid_amount + amount, total_amount)
         status = "مدفوع" if new_paid >= total_amount else "مدفوع جزئيًا"
-        session.execute(text("""
+        session.execute(
+            text("""
             UPDATE installments SET paid_amount = :p, status = :s WHERE id = :id
-        """), {"p": new_paid, "s": status, "id": installment_id})
+        """),
+            {"p": new_paid, "s": status, "id": installment_id},
+        )
         session.commit()
         clear_all_cache()
         return True
@@ -392,21 +497,27 @@ def pay_installment(installment_id, amount):
 @st.cache_data(ttl=CACHE_TTL)
 def get_total_collected():
     conn = get_connection()
-    df = conn.query("SELECT COALESCE(SUM(paid_amount), 0) as total FROM installments", ttl=0)
+    df = conn.query(
+        "SELECT COALESCE(SUM(paid_amount), 0) as total FROM installments", ttl=0
+    )
     return df.iloc[0]["total"]
 
 
 @st.cache_data(ttl=CACHE_TTL)
 def get_total_due():
     conn = get_connection()
-    df = conn.query("SELECT COALESCE(SUM(amount - paid_amount), 0) as total FROM installments", ttl=0)
+    df = conn.query(
+        "SELECT COALESCE(SUM(amount - paid_amount), 0) as total FROM installments",
+        ttl=0,
+    )
     return df.iloc[0]["total"]
 
 
 @st.cache_data(ttl=CACHE_TTL)
 def get_overdue_installments():
     conn = get_connection()
-    df = conn.query("""
+    df = conn.query(
+        """
         SELECT i.id, u.unit_number, cu.name, i.due_date, i.amount, i.paid_amount, i.status
         FROM installments i
         JOIN contracts c ON i.contract_id = c.id
@@ -414,7 +525,9 @@ def get_overdue_installments():
         JOIN customers cu ON c.customer_id = cu.id
         WHERE i.due_date < CURRENT_DATE AND i.status != 'مدفوع'
         ORDER BY i.due_date
-    """, ttl=0)
+    """,
+        ttl=0,
+    )
     return df.values.tolist()
 
 
@@ -428,21 +541,34 @@ def get_all_loans():
 
 def get_loan_payments(loan_id):
     conn = get_connection()
-    df = conn.query("""
+    df = conn.query(
+        """
         SELECT id, payment_number, due_date, amount, paid_amount, status
         FROM loan_payments WHERE loan_id = :id ORDER BY payment_number
-    """, params={"id": loan_id}, ttl=0)
+    """,
+        params={"id": loan_id},
+        ttl=0,
+    )
     return df.values.tolist()
 
 
 def add_loan(lender_name, lender_type, amount, interest_rate, start_date, notes=""):
     conn = get_connection()
     with conn.session as session:
-        result = session.execute(text("""
+        result = session.execute(
+            text("""
             INSERT INTO loans (lender_name, lender_type, amount, interest_rate, start_date, notes)
             VALUES (:ln, :lt, :a, :ir, :sd, :n) RETURNING id
-        """), {"ln": lender_name, "lt": lender_type, "a": amount,
-               "ir": interest_rate, "sd": start_date, "n": notes})
+        """),
+            {
+                "ln": lender_name,
+                "lt": lender_type,
+                "a": amount,
+                "ir": interest_rate,
+                "sd": start_date,
+                "n": notes,
+            },
+        )
         session.commit()
         clear_all_cache()
         return result.scalar()
@@ -451,10 +577,13 @@ def add_loan(lender_name, lender_type, amount, interest_rate, start_date, notes=
 def add_loan_payment(loan_id, number, due_date, amount):
     conn = get_connection()
     with conn.session as session:
-        session.execute(text("""
+        session.execute(
+            text("""
             INSERT INTO loan_payments (loan_id, payment_number, due_date, amount, paid_amount, status)
             VALUES (:li, :n, :dd, :a, 0, 'مستحق')
-        """), {"li": loan_id, "n": number, "dd": due_date, "a": amount})
+        """),
+            {"li": loan_id, "n": number, "dd": due_date, "a": amount},
+        )
         session.commit()
         clear_all_cache()
 
@@ -462,24 +591,35 @@ def add_loan_payment(loan_id, number, due_date, amount):
 def pay_loan_payment(payment_id, amount):
     conn = get_connection()
     with conn.session as session:
-        result = session.execute(text("SELECT amount, paid_amount FROM loan_payments WHERE id = :id"),
-                                 {"id": payment_id})
+        result = session.execute(
+            text("SELECT amount, paid_amount FROM loan_payments WHERE id = :id"),
+            {"id": payment_id},
+        )
         row = result.fetchone()
         if not row:
             return False
         total_amount, paid_amount = row
         new_paid = min(paid_amount + amount, total_amount)
         status = "مدفوع" if new_paid >= total_amount else "مدفوع جزئيًا"
-        session.execute(text("UPDATE loan_payments SET paid_amount=:p, status=:s WHERE id=:id"),
-                        {"p": new_paid, "s": status, "id": payment_id})
+        session.execute(
+            text("UPDATE loan_payments SET paid_amount=:p, status=:s WHERE id=:id"),
+            {"p": new_paid, "s": status, "id": payment_id},
+        )
 
-        result = session.execute(text("SELECT loan_id FROM loan_payments WHERE id = :id"),
-                                 {"id": payment_id})
+        result = session.execute(
+            text("SELECT loan_id FROM loan_payments WHERE id = :id"), {"id": payment_id}
+        )
         loan_id = result.scalar()
-        result = session.execute(text("SELECT COUNT(*) FROM loan_payments WHERE loan_id=:lid AND status != 'مدفوع'"),
-                                 {"lid": loan_id})
+        result = session.execute(
+            text(
+                "SELECT COUNT(*) FROM loan_payments WHERE loan_id=:lid AND status != 'مدفوع'"
+            ),
+            {"lid": loan_id},
+        )
         if result.scalar() == 0:
-            session.execute(text("UPDATE loans SET status='مسدد' WHERE id=:id"), {"id": loan_id})
+            session.execute(
+                text("UPDATE loans SET status='مسدد' WHERE id=:id"), {"id": loan_id}
+            )
         session.commit()
         clear_all_cache()
         return True
@@ -488,7 +628,10 @@ def pay_loan_payment(payment_id, amount):
 @st.cache_data(ttl=CACHE_TTL)
 def get_total_debt():
     conn = get_connection()
-    df = conn.query("SELECT COALESCE(SUM(amount - paid_amount), 0) as total FROM loan_payments", ttl=0)
+    df = conn.query(
+        "SELECT COALESCE(SUM(amount - paid_amount), 0) as total FROM loan_payments",
+        ttl=0,
+    )
     return df.iloc[0]["total"]
 
 
@@ -502,21 +645,27 @@ def get_total_borrowed():
 @st.cache_data(ttl=CACHE_TTL)
 def get_total_repaid():
     conn = get_connection()
-    df = conn.query("SELECT COALESCE(SUM(paid_amount), 0) as total FROM loan_payments", ttl=0)
+    df = conn.query(
+        "SELECT COALESCE(SUM(paid_amount), 0) as total FROM loan_payments", ttl=0
+    )
     return df.iloc[0]["total"]
 
 
 @st.cache_data(ttl=CACHE_TTL)
 def get_upcoming_loan_payments(days=30):
     conn = get_connection()
-    df = conn.query("""
+    df = conn.query(
+        """
         SELECT lp.id, l.lender_name, lp.due_date, lp.amount, lp.paid_amount, lp.status
         FROM loan_payments lp
         JOIN loans l ON lp.loan_id = l.id
         WHERE lp.due_date >= CURRENT_DATE AND lp.due_date <= CURRENT_DATE + :days
           AND lp.status != 'مدفوع'
         ORDER BY lp.due_date
-    """, params={"days": days}, ttl=0)
+    """,
+        params={"days": days},
+        ttl=0,
+    )
     return df.values.tolist()
 
 
@@ -531,23 +680,38 @@ def get_all_categories():
 @st.cache_data(ttl=CACHE_TTL)
 def get_all_expenses():
     conn = get_connection()
-    df = conn.query("""
+    df = conn.query(
+        """
         SELECT e.id, ec.name, e.building, e.description, e.amount, e.expense_date, e.vendor
         FROM expenses e
         LEFT JOIN expense_categories ec ON e.category_id = ec.id
         ORDER BY e.expense_date DESC, e.id DESC
-    """, ttl=0)
+    """,
+        ttl=0,
+    )
     return df.values.tolist()
 
 
-def add_expense(category_id, building, description, amount, expense_date, vendor="", notes=""):
+def add_expense(
+    category_id, building, description, amount, expense_date, vendor="", notes=""
+):
     conn = get_connection()
     with conn.session as session:
-        session.execute(text("""
+        session.execute(
+            text("""
             INSERT INTO expenses (category_id, building, description, amount, expense_date, vendor, notes)
             VALUES (:ci, :b, :d, :a, :ed, :v, :n)
-        """), {"ci": category_id, "b": building, "d": description, "a": amount,
-               "ed": expense_date, "v": vendor, "n": notes})
+        """),
+            {
+                "ci": category_id,
+                "b": building,
+                "d": description,
+                "a": amount,
+                "ed": expense_date,
+                "v": vendor,
+                "n": notes,
+            },
+        )
         session.commit()
         clear_all_cache()
 
@@ -562,35 +726,44 @@ def get_total_expenses():
 @st.cache_data(ttl=CACHE_TTL)
 def get_expenses_by_building():
     conn = get_connection()
-    df = conn.query("""
+    df = conn.query(
+        """
         SELECT building, SUM(amount), COUNT(*) FROM expenses
         WHERE building IS NOT NULL AND building != ''
         GROUP BY building ORDER BY building
-    """, ttl=0)
+    """,
+        ttl=0,
+    )
     return df.values.tolist()
 
 
 @st.cache_data(ttl=CACHE_TTL)
 def get_expenses_by_category():
     conn = get_connection()
-    df = conn.query("""
+    df = conn.query(
+        """
         SELECT ec.name, SUM(e.amount), COUNT(*) FROM expenses e
         LEFT JOIN expense_categories ec ON e.category_id = ec.id
         GROUP BY ec.name ORDER BY SUM(e.amount) DESC
-    """, ttl=0)
+    """,
+        ttl=0,
+    )
     return df.values.tolist()
 
 
 @st.cache_data(ttl=CACHE_TTL)
 def get_buildings_list():
     conn = get_connection()
-    df = conn.query("""
+    df = conn.query(
+        """
         SELECT DISTINCT building FROM (
             SELECT building FROM units WHERE building IS NOT NULL AND building != ''
             UNION
             SELECT building FROM expenses WHERE building IS NOT NULL AND building != ''
         ) ORDER BY building
-    """, ttl=0)
+    """,
+        ttl=0,
+    )
     return df["building"].tolist()
 
 
@@ -598,24 +771,34 @@ def get_buildings_list():
 @st.cache_data(ttl=CACHE_TTL)
 def report_sales_summary():
     conn = get_connection()
-    df = conn.query("""
+    df = conn.query(
+        """
         SELECT COUNT(*), COALESCE(SUM(total_price), 0), COALESCE(SUM(down_payment), 0)
         FROM contracts
-    """, ttl=0)
+    """,
+        ttl=0,
+    )
     count, total, down = df.iloc[0]
-    return {"count": int(count), "total": float(total), "down": float(down),
-            "remaining": float(total - down)}
+    return {
+        "count": int(count),
+        "total": float(total),
+        "down": float(down),
+        "remaining": float(total - down),
+    }
 
 
 @st.cache_data(ttl=CACHE_TTL)
 def report_sales_by_building():
     conn = get_connection()
-    df = conn.query("""
+    df = conn.query(
+        """
         SELECT u.building, COUNT(c.id), COALESCE(SUM(c.total_price), 0)
         FROM contracts c
         JOIN units u ON c.unit_id = u.id
         GROUP BY u.building ORDER BY u.building
-    """, ttl=0)
+    """,
+        ttl=0,
+    )
     return df.values.tolist()
 
 
@@ -629,27 +812,34 @@ def report_units_status():
 @st.cache_data(ttl=CACHE_TTL)
 def report_cashflow():
     conn = get_connection()
-    df_in = conn.query("SELECT COALESCE(SUM(paid_amount), 0) as total FROM installments", ttl=0)
+    df_in = conn.query(
+        "SELECT COALESCE(SUM(paid_amount), 0) as total FROM installments", ttl=0
+    )
     cash_in = float(df_in.iloc[0]["total"])
 
     df_exp = conn.query("SELECT COALESCE(SUM(amount), 0) as total FROM expenses", ttl=0)
     expenses = float(df_exp.iloc[0]["total"])
 
-    df_rep = conn.query("SELECT COALESCE(SUM(paid_amount), 0) as total FROM loan_payments", ttl=0)
+    df_rep = conn.query(
+        "SELECT COALESCE(SUM(paid_amount), 0) as total FROM loan_payments", ttl=0
+    )
     loan_repaid = float(df_rep.iloc[0]["total"])
 
     cash_out = expenses + loan_repaid
     return {
-        "cash_in": cash_in, "expenses": expenses,
-        "loan_repaid": loan_repaid, "cash_out": cash_out,
-        "net": cash_in - cash_out
+        "cash_in": cash_in,
+        "expenses": expenses,
+        "loan_repaid": loan_repaid,
+        "cash_out": cash_out,
+        "net": cash_in - cash_out,
     }
 
 
 @st.cache_data(ttl=CACHE_TTL)
 def report_unit_profitability():
     conn = get_connection()
-    df = conn.query("""
+    df = conn.query(
+        """
         SELECT u.id, u.unit_number, u.building, u.area, u.price, u.status,
                c.total_price as sale_price,
                COALESCE((SELECT SUM(amount) FROM expenses WHERE building = u.building), 0) as building_cost,
@@ -657,7 +847,9 @@ def report_unit_profitability():
         FROM units u
         LEFT JOIN contracts c ON c.unit_id = u.id
         ORDER BY u.building, u.unit_number
-    """, ttl=0)
+    """,
+        ttl=0,
+    )
 
     result = []
     for _, row in df.iterrows():
@@ -667,31 +859,44 @@ def report_unit_profitability():
         sale_price = float(row["sale_price"]) if row["sale_price"] else 0
         profit = sale_price - unit_cost if sale_price else -unit_cost
 
-        result.append({
-            "unit_number": row["unit_number"], "building": row["building"],
-            "area": row["area"], "price": row["price"], "status": row["status"],
-            "sale_price": sale_price, "unit_cost": unit_cost, "profit": profit
-        })
+        result.append(
+            {
+                "unit_number": row["unit_number"],
+                "building": row["building"],
+                "area": row["area"],
+                "price": row["price"],
+                "status": row["status"],
+                "sale_price": sale_price,
+                "unit_cost": unit_cost,
+                "profit": profit,
+            }
+        )
     return result
 
 
 @st.cache_data(ttl=CACHE_TTL)
 def report_monthly_collections():
     conn = get_connection()
-    df = conn.query("""
+    df = conn.query(
+        """
         SELECT TO_CHAR(due_date, 'YYYY-MM'), COALESCE(SUM(amount), 0), COALESCE(SUM(paid_amount), 0)
         FROM installments GROUP BY TO_CHAR(due_date, 'YYYY-MM') ORDER BY 1
-    """, ttl=0)
+    """,
+        ttl=0,
+    )
     return df.values.tolist()
 
 
 @st.cache_data(ttl=CACHE_TTL)
 def report_monthly_expenses():
     conn = get_connection()
-    df = conn.query("""
+    df = conn.query(
+        """
         SELECT TO_CHAR(expense_date, 'YYYY-MM'), COALESCE(SUM(amount), 0)
         FROM expenses GROUP BY TO_CHAR(expense_date, 'YYYY-MM') ORDER BY 1
-    """, ttl=0)
+    """,
+        ttl=0,
+    )
     return df.values.tolist()
 
 
@@ -699,7 +904,10 @@ def report_monthly_expenses():
 @st.cache_data(ttl=CACHE_TTL)
 def get_all_users():
     conn = get_connection()
-    df = conn.query("SELECT id, username, full_name, role, active, created_at FROM users ORDER BY id", ttl=0)
+    df = conn.query(
+        "SELECT id, username, full_name, role, active, created_at FROM users ORDER BY id",
+        ttl=0,
+    )
     return df.values.tolist()
 
 
@@ -707,11 +915,19 @@ def add_user(username, password, full_name, role):
     conn = get_connection()
     with conn.session as session:
         try:
-            session.execute(text("""
+            session.execute(
+                text("""
                 INSERT INTO users (username, password_hash, full_name, role, active, created_at)
                 VALUES (:u, :p, :n, :r, 1, :d)
-            """), {"u": username, "p": hash_password(password),
-                   "n": full_name, "r": role, "d": str(date.today())})
+            """),
+                {
+                    "u": username,
+                    "p": hash_password(password),
+                    "n": full_name,
+                    "r": role,
+                    "d": str(date.today()),
+                },
+            )
             session.commit()
             clear_all_cache()
             return True
@@ -722,8 +938,10 @@ def add_user(username, password, full_name, role):
 def update_user(user_id, full_name, role, active):
     conn = get_connection()
     with conn.session as session:
-        session.execute(text("UPDATE users SET full_name=:n, role=:r, active=:a WHERE id=:id"),
-                        {"n": full_name, "r": role, "a": active, "id": user_id})
+        session.execute(
+            text("UPDATE users SET full_name=:n, role=:r, active=:a WHERE id=:id"),
+            {"n": full_name, "r": role, "a": active, "id": user_id},
+        )
         session.commit()
         clear_all_cache()
 
@@ -731,8 +949,10 @@ def update_user(user_id, full_name, role, active):
 def change_password(user_id, new_password):
     conn = get_connection()
     with conn.session as session:
-        session.execute(text("UPDATE users SET password_hash=:p WHERE id=:id"),
-                        {"p": hash_password(new_password), "id": user_id})
+        session.execute(
+            text("UPDATE users SET password_hash=:p WHERE id=:id"),
+            {"p": hash_password(new_password), "id": user_id},
+        )
         session.commit()
         clear_all_cache()
 
@@ -740,8 +960,9 @@ def change_password(user_id, new_password):
 def delete_user(user_id):
     conn = get_connection()
     with conn.session as session:
-        result = session.execute(text("SELECT username FROM users WHERE id = :id"),
-                                 {"id": user_id})
+        result = session.execute(
+            text("SELECT username FROM users WHERE id = :id"), {"id": user_id}
+        )
         row = result.fetchone()
         if not row or row[0] == "admin":
             return False
@@ -749,7 +970,9 @@ def delete_user(user_id):
         session.commit()
         clear_all_cache()
         return True
-  def export_full_data():
+
+
+def export_full_data():
     """تصدير كل البيانات في dictionary"""
     conn = get_connection()
     data = {}
