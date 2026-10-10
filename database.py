@@ -4,6 +4,140 @@ from datetime import date
 import hashlib
 import pandas as pd
 from sqlalchemy import text
+def create_tables():
+    """إنشاء الجداول لو مش موجودة"""
+    conn = get_connection()
+    with conn.session as session:
+        # المستخدمين
+        session.execute(text("""
+        CREATE TABLE IF NOT EXISTS users (
+            id SERIAL PRIMARY KEY,
+            username VARCHAR(100) UNIQUE NOT NULL,
+            password_hash VARCHAR(255) NOT NULL,
+            full_name VARCHAR(200),
+            role VARCHAR(50) NOT NULL DEFAULT 'sales',
+            active INTEGER DEFAULT 1,
+            created_at DATE
+        )
+        """))
+
+        # الوحدات
+        session.execute(text("""
+        CREATE TABLE IF NOT EXISTS units (
+            id SERIAL PRIMARY KEY,
+            unit_number VARCHAR(50) UNIQUE NOT NULL,
+            building VARCHAR(100),
+            floor INTEGER,
+            area REAL,
+            price REAL,
+            status VARCHAR(50) DEFAULT 'متاحة'
+        )
+        """))
+
+        # العملاء
+        session.execute(text("""
+        CREATE TABLE IF NOT EXISTS customers (
+            id SERIAL PRIMARY KEY,
+            name VARCHAR(200) NOT NULL,
+            phone VARCHAR(50),
+            national_id VARCHAR(50),
+            address VARCHAR(300),
+            notes TEXT
+        )
+        """))
+
+        # العقود
+        session.execute(text("""
+        CREATE TABLE IF NOT EXISTS contracts (
+            id SERIAL PRIMARY KEY,
+            unit_id INTEGER REFERENCES units(id),
+            customer_id INTEGER REFERENCES customers(id),
+            total_price REAL NOT NULL,
+            down_payment REAL DEFAULT 0,
+            contract_date DATE,
+            notes TEXT
+        )
+        """))
+
+        # الأقساط
+        session.execute(text("""
+        CREATE TABLE IF NOT EXISTS installments (
+            id SERIAL PRIMARY KEY,
+            contract_id INTEGER REFERENCES contracts(id),
+            installment_number INTEGER,
+            due_date DATE,
+            amount REAL,
+            paid_amount REAL DEFAULT 0,
+            status VARCHAR(50) DEFAULT 'مستحق'
+        )
+        """))
+
+        # القروض
+        session.execute(text("""
+        CREATE TABLE IF NOT EXISTS loans (
+            id SERIAL PRIMARY KEY,
+            lender_name VARCHAR(200) NOT NULL,
+            lender_type VARCHAR(50) DEFAULT 'فرد',
+            amount REAL NOT NULL,
+            interest_rate REAL DEFAULT 0,
+            start_date DATE,
+            notes TEXT,
+            status VARCHAR(50) DEFAULT 'نشط'
+        )
+        """))
+
+        # أقساط القروض
+        session.execute(text("""
+        CREATE TABLE IF NOT EXISTS loan_payments (
+            id SERIAL PRIMARY KEY,
+            loan_id INTEGER REFERENCES loans(id),
+            payment_number INTEGER,
+            due_date DATE,
+            amount REAL,
+            paid_amount REAL DEFAULT 0,
+            status VARCHAR(50) DEFAULT 'مستحق'
+        )
+        """))
+
+        # بنود المصروفات
+        session.execute(text("""
+        CREATE TABLE IF NOT EXISTS expense_categories (
+            id SERIAL PRIMARY KEY,
+            name VARCHAR(100) UNIQUE NOT NULL
+        )
+        """))
+
+        # المصروفات
+        session.execute(text("""
+        CREATE TABLE IF NOT EXISTS expenses (
+            id SERIAL PRIMARY KEY,
+            category_id INTEGER REFERENCES expense_categories(id),
+            building VARCHAR(100),
+            description VARCHAR(300),
+            amount REAL NOT NULL,
+            expense_date DATE,
+            vendor VARCHAR(200),
+            notes TEXT
+        )
+        """))
+
+        # بنود افتراضية
+        result = session.execute(text("SELECT COUNT(*) FROM expense_categories"))
+        if result.scalar() == 0:
+            for cat in ["مواد بناء", "مقاولون", "عمالة", "إشراف هندسي",
+                        "تشطيبات", "كهرباء وسباكة", "رخصة وتراخيص",
+                        "مصاريف إدارية", "أخرى"]:
+                session.execute(text("INSERT INTO expense_categories (name) VALUES (:name)"), {"name": cat})
+
+        # مستخدم admin افتراضي
+        result = session.execute(text("SELECT COUNT(*) FROM users"))
+        if result.scalar() == 0:
+            session.execute(
+                text("INSERT INTO users (username, password_hash, full_name, role, active, created_at) VALUES (:u, :p, :n, :r, 1, :d)"),
+                {"u": "admin", "p": hash_password("admin123"), "n": "المدير", "r": "admin", "d": str(date.today())}
+            )
+
+        session.commit()
 
 DB_NAME = "realestate.db"
 
