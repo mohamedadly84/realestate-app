@@ -749,3 +749,21 @@ def delete_user(user_id):
         session.commit()
         clear_all_cache()
         return True
+    def export_full_data():
+    """تصدير كل البيانات في dictionary"""
+    conn = get_connection()
+    data = {}
+    tables = {
+        "units": "SELECT * FROM units",
+        "customers": "SELECT * FROM customers",
+        "contracts": "SELECT * FROM contracts",
+        "installments": "SELECT * FROM installments",
+        "loans": "SELECT * FROM loans",
+        "loan_payments": "SELECT * FROM loan_payments",
+        "expenses": "SELECT * FROM expenses",
+        "users": "SELECT id, username, full_name, role, active, created_at FROM users",
+    }
+    for name, query in tables.items():
+        df = conn.query(query, ttl=0)
+        data[name] = {"columns": df.columns.tolist(), "rows": df.values.tolist()}
+    return data
